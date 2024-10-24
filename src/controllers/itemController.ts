@@ -8,57 +8,55 @@ import { deleteObjectS3 } from '../services/s3';
 const prisma = new PrismaClient();
 
 export const createItem = async (req: Request, res: Response) => {
-    const { asOfDate, ...body } = req.body; // Body is available in POST request
-    const formattedDate = new Date(asOfDate)
-    console.log(asOfDate)
-    console.log(formattedDate)
+    const { asOfDate, ...body } = req.body; 
+    const formattedDate = new Date(asOfDate);
+
     try {
         const result = itemSchema.safeParse({ ...body, asOfDate: formattedDate });
 
         if (!result.success) {
             res.status(statusCode.BAD_REQUEST).json({
                 message: "Input Validation Error",
-                error: result.error.errors || "Unknown error", // Send error details for debugging
+                error: result.error.errors || "Unknown error",
             });
             return;
         }
 
-        const categoryId = req.params.categoryId
+        const categoryId = req.params.categoryId;
 
+        // Check if category exists
         const category = await prisma.category.findUnique({
-            where: {
-                categoryId: categoryId,
-            },
-        })
+            where: { categoryId },
+        });
 
         if (!category) {
-            res.status(statusCode.BAD_REQUEST).json({
-                message: "Category not found"
-            });
+            res.status(statusCode.BAD_REQUEST).json({ message: "Category not found" });
             return;
         }
 
+        // Create the item and connect it with the existing category
         const item = await prisma.item.create({
             data: {
                 ...body,
                 asOfDate: formattedDate,
-                categoryId: categoryId
-            }
-        })
+                category: {
+                    connect: { categoryId }, // Use connect here
+                },
+            },
+        });
 
         res.status(statusCode.OK).json({
             message: "Item created successfully",
-            item: item
+            item,
         });
-
     } catch (error: any) {
-        console.error("Error during processing: ", error); // Log the error for better debugging
+        console.error("Error during processing: ", error);
         res.status(statusCode.INTERNAL_SERVER_ERROR).json({
             message: "Internal Server Error",
-            error: error.message || "Unknown error"
+            error: error.message || "Unknown error",
         });
     }
-}
+};
 
 export const updateItem = async (req: Request, res: Response) => {
     const itemId = req.params.itemId
